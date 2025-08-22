@@ -3,7 +3,7 @@ a lightweight music player built for the user, now rewritten in C++.
 
 ---
 
-You read that right. [Koulouri(py)](https:://github.com/zeropointnothing/koulouri) is back and better than ever!
+You read that right. [Koulouri(py)](https://github.com/zeropointnothing/koulouri) is back and better than ever!
 
 ## What's new?
 
