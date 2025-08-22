@@ -98,11 +98,6 @@ private:
     std::string tempPath;
 };
 
-class FileMetadata {
-public:
-    explicit FileMetadata(const std::string &inputPath);
-};
-
 class AudioPlayer {
 public:
     AudioPlayer();
