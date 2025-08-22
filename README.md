@@ -5,6 +5,10 @@ a lightweight music player built for the user, now rewritten in C++.
 
 You read that right. [Koulouri(py)](https://github.com/zeropointnothing/koulouri) is back and better than ever!
 
+## DISCLAIMER
+This project is currently in a heavy WIP state. Both frontends are nowhere near completion,
+but progress is going steadily!
+
 ## What's new?
 
 - With the power of PortAudio and libsndfile (through libKoulouri), Koulouri is faster, more memory efficient, and
