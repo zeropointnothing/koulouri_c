@@ -1,17 +1,38 @@
 #pragma once
 #include <ncurses.h>
+#include "libkoulouri/metahandler.h"
+#include "libkoulouri/player.h"
 
-namespace CursesGui {
-    class CursesMainWindow {
-    public:
-        CursesMainWindow();
-        ~CursesMainWindow();
+enum WindowType {
+    TrackList
+};
 
-        int main() const;
-        static void cleanup();
-    private:
-        bool running = true;
+class CursesMainWindow {
+public:
+    CursesMainWindow();
+    ~CursesMainWindow();
 
-    };
-}
+    int main();
+    static void cleanup();
+private:
+    AudioPlayer player;
+    bool running = true;
+    WindowType windowType;
+    std::string userInput;
 
+    MetaHandler mhandler = MetaHandler();
+    MetaCache mcache = MetaCache();
+};
+
+class MenuHandler {
+public:
+    using FuncCallback = std::function<int(CursesMainWindow* w)>;
+    MenuHandler() = default;
+    ~MenuHandler() = default;
+
+    void registerCallback(WindowType type, const FuncCallback& callback);
+    int call(WindowType type, CursesMainWindow *win);
+
+private:
+    std::unordered_map<WindowType, FuncCallback> _callbacks;
+};
