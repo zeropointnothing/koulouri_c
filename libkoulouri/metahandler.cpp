@@ -43,6 +43,25 @@ const std::unordered_map<std::string, Track>& MetaCache::getCache() const {
     return cache_;
 }
 
+/**
+ * Sort the MetaCache via a custom callback.
+ *
+ * Note, for integrity, all Tracks will be returned as const pointers.
+ * @param key The function to sort with
+ * @return
+ */
+std::vector<const Track*> MetaCache::sortBy(const SortKey &key) const {
+    std::vector<const Track*> result; // ensure integrity by forbidding changes
+    result.reserve(cache_.size());
+    for (const auto &[id, track] : cache_) {
+        result.push_back(&track);
+    }
+    std::sort(result.begin(), result.end(), [&](const Track* a, const Track* b) {
+        return key(*a,*b);
+    });
+    return result;
+}
+
 bool MetaCache::dumpCache(std::string &path) const {
     std::ofstream out(path, std::ios::binary | std::ios::trunc);
     if (!out) return false;

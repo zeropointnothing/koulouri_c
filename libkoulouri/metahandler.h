@@ -1,4 +1,5 @@
 #pragma once
+#include <functional>
 #include <vector>
 #include <string>
 #include <unordered_map>
@@ -28,6 +29,8 @@ public:
 
     void setCache(std::unordered_map<std::string, Track>&& newCache);
     const std::unordered_map<std::string, Track>& getCache() const;
+    using SortKey = std::function<bool(const Track&, const Track&)>;
+    std::vector<const Track*> sortBy(const SortKey &key) const;
 
 private:
     std::unordered_map<std::string, Track> cache_;
