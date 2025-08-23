@@ -1,6 +1,5 @@
 #include <cstdlib>
 #include <iostream>
-#include <iterator>
 
 #include "curses_gui/cursesmainwindow.h"
 #include "koulouri_shared/alsasilencer.h"

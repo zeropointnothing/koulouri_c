@@ -13,9 +13,6 @@ CursesMainWindow::CursesMainWindow() {
     mhandler.populateMetaCache("/home/exii/Music", &mcache);
     userInput = "";
     windowType = WindowType::TrackList;
-    player = AudioPlayer();
-
-    auto MENU_HANDLER = MenuHandler();
 };
 CursesMainWindow::~CursesMainWindow() = default;
 void CursesMainWindow::cleanup() {
