@@ -1,4 +1,5 @@
 #pragma once
+#include <algorithm>
 #include <iostream>
 #include <sndfile.h>
 #include <portaudio.h>
@@ -114,10 +115,20 @@ public:
     bool isPlaying();
 
     size_t getPos() const { return playbackPos; };
+    double posToSeconds(size_t raw) const {
+        return static_cast<double>(std::clamp(raw, std::size_t{0}, playbackSize)) / (sampleRate * numChannels);
+    };
+    size_t secondsToPos(double seconds) const {
+        return static_cast<size_t>(std::clamp(seconds, 0.0, posToSeconds(playbackSize)) * (sampleRate * numChannels));
+    };
+
     void setPos(size_t to) {
-        playbackPos = std::min(to, rawAudio.size());
+        playbackPos = std::clamp(to, std::size_t{0}, rawAudio.size());
     };
     size_t getMaxPos() const { return playbackSize; };
+
+    int getSampleRate() const { return sampleRate; };
+    int getChannels() const { return numChannels; };
 
     void print(std::string text);
 

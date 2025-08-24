@@ -239,6 +239,13 @@ int AudioPlayer::audioCallback(
     ) {
     AudioPlayer* player = static_cast<AudioPlayer*>(userData);
 
+    // Despite the return call, none of the code following this statement is safe to run if the playbackPos
+    // is greater than or equal to the size of the internal buffer. Thus, we should safely quit here by signalling to
+    // PortAudio that we've completed the playback.
+    if (player->getPos() >= player->rawAudio.size()) {
+        return paComplete;
+    }
+
     size_t samplesToWrite = framesPerBuffer * player->numChannels;
     size_t availableSamples = player->rawAudio.size() - player->getPos();
     samplesToWrite = std::min(samplesToWrite, availableSamples);
