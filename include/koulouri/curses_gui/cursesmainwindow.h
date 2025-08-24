@@ -13,15 +13,20 @@ public:
     ~CursesMainWindow();
 
     int main();
+    int renderBaseUi();
     static void cleanup();
 private:
     AudioPlayer player;
+    const Track *currentTrack;
     bool running = true;
     WindowType windowType;
     std::string userInput;
 
     MetaHandler mhandler = MetaHandler();
     MetaCache mcache = MetaCache();
+
+    int maxy;
+    int maxx;
 };
 
 class MenuHandler {
