@@ -26,8 +26,8 @@ void MenuHandler::registerCallback(const WindowType type, const FuncCallback &ca
     // _acallbacks.insert("a", callback);
     _callbacks[type] = callback;
 }
-int MenuHandler::call(const WindowType type, CursesMainWindow *win) {
-    return _callbacks[type](win);
+int MenuHandler::call(const WindowType type, CursesMainWindow *win, MenuHandler *handler) {
+    return _callbacks[type](win, handler);
 }
 
 void rectangle(int y1, int x1, int y2, int x2)
@@ -58,12 +58,24 @@ std::string formatTime(double seconds) {
 }
 
 
-int CursesMainWindow::renderBaseUi() {
-    double positionSeconds = player.posToSeconds(player.getPos());
-    double maxPositionSeconds = player.posToSeconds(player.getMaxPos());
+int CursesMainWindow::renderBaseUi(const WindowType winType) {
+    const double positionSeconds = player.posToSeconds(player.getPos());
+    const double maxPositionSeconds = player.posToSeconds(player.getMaxPos());
 
     // box(stdscr, 0, 0);
     rectangle(0,0,maxy-2,maxx-1);
+
+    // render basic info
+    std::string title = "[ koulouri - C++ Rewrite";
+    title += " / ";
+    switch (winType) {
+        case WindowType::TrackList: {title += "tracks"; break;}
+        default: {title += "unknown (report to dev!)"; break;}
+    }
+    title += " / volume: " + std::to_string(player.getVolume()) + " ]";
+    move(0, (maxx/2)-(static_cast<int>(title.length())/2));
+    addstr(title.c_str());
+
 
     // create song details
     if (player.isLoaded()) {
@@ -97,7 +109,7 @@ int CursesMainWindow::main() {
     keypad(stdscr, true);
     auto menu_handler = MenuHandler();
 
-    menu_handler.registerCallback(WindowType::TrackList, [](CursesMainWindow *win) {
+    menu_handler.registerCallback(WindowType::TrackList, [](CursesMainWindow *win, MenuHandler *handler) {
         const std::vector<const Track*> byArtist = win->mcache.sortBy([](const Track& a, const Track& b) {
             return a.artist < b.artist;
         });
@@ -129,7 +141,7 @@ int CursesMainWindow::main() {
             addstr(userInputStr.c_str());
             clrtoeol();
 
-            win->renderBaseUi();
+            win->renderBaseUi(win->windowType);
 
             int k = getch();
             if (k == ERR) {
@@ -194,7 +206,7 @@ int CursesMainWindow::main() {
         return 0;
     });
 
-    const int result = menu_handler.call(WindowType::TrackList, this);
+    const int result = menu_handler.call(WindowType::TrackList, this, &menu_handler);
 
     endwin();
     player.stop();

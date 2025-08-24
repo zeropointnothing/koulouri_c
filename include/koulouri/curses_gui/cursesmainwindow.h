@@ -13,11 +13,12 @@ public:
     ~CursesMainWindow();
 
     int main();
-    int renderBaseUi();
+    int renderBaseUi(WindowType winType);
     static void cleanup();
 private:
     AudioPlayer player;
     const Track *currentTrack;
+    const std::vector<Track*> queue;
     bool running = true;
     WindowType windowType;
     std::string userInput;
@@ -31,12 +32,12 @@ private:
 
 class MenuHandler {
 public:
-    using FuncCallback = std::function<int(CursesMainWindow* w)>;
+    using FuncCallback = std::function<int(CursesMainWindow *w, MenuHandler *handler)>;
     MenuHandler() = default;
     ~MenuHandler() = default;
 
     void registerCallback(WindowType type, const FuncCallback& callback);
-    int call(WindowType type, CursesMainWindow *win);
+    int call(WindowType type, CursesMainWindow *win, MenuHandler *handler);
 
 private:
     std::unordered_map<WindowType, FuncCallback> _callbacks;
