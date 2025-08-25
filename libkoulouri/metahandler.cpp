@@ -5,6 +5,8 @@
 #include <iostream>
 #include <fstream>
 
+#include "logger.h"
+
 Track::Track(const std::string &path) : filePath(path) {}
 
 bool Track::load() {
@@ -16,7 +18,11 @@ bool Track::load() {
         trackNumber = f.tag()->track();
 
         if (title.empty() && artist.empty() && album.empty()) {
-            std::cerr << "Failed to parse metadata: No artist, no title, no album, no service. | " << filePath << std::endl;
+            Logger::g_log("MetaHandler",
+                Logger::Level::ERROR,
+                "metaloader",
+                "Failed to parse metadata: No artist, no title, no album, no service. | " + filePath
+                );
             return false;
         }
         return true;
@@ -186,7 +192,7 @@ std::vector<Track> MetaHandler::loadTrackFromDirectory(const std::string &direct
             track.id = generateTrackID(track);
             tracks.push_back(track);
         } else {
-            std::cerr << "Failed to load metadata for file: " << path << std::endl;
+            Logger::g_log("MetaHandler", Logger::Level::ERROR, "loader", "Failed to load metadata for file: " + path);
         }
     }
 
@@ -204,7 +210,7 @@ void MetaHandler::populateMetaCache(const std::string &directoryPath, MetaCache 
             originalCache->addTrack(track);
             i += 1;
         } else {
-            std::cerr << "Failed to load metadata for file: " << path << std::endl;
+            Logger::g_log("MetaHandler", Logger::Level::ERROR, "populator", "Failed to load metadata for file: " + path);
         }
     }
 }

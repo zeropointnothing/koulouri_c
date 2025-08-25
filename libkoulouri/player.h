@@ -9,6 +9,7 @@
 #include <unistd.h>
 
 #include "FormatTools.h"
+#include "logger.h"
 
 enum class PlayerActionEnum {
     /**
@@ -133,6 +134,8 @@ public:
     void print(std::string text);
 
 private:
+    Logger logger;
+
     static int audioCallback(const void *inputBuffer, void *outputBuffer,
                              unsigned long framesPerBuffer,
                              const PaStreamCallbackTimeInfo *timeInfo,

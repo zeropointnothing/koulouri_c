@@ -3,6 +3,8 @@
 #include <portaudio.h>
 #include <cstring>
 #include <algorithm>
+#include <sstream>
+#include "logger.h"
 
 FfmpegFile::FfmpegFile(const std::string &inputPath) {
     // Create temp file
@@ -14,18 +16,33 @@ FfmpegFile::FfmpegFile(const std::string &inputPath) {
     tempPath = tmpTemplate;
 
     // Run FFmpeg to convert inputPath to WAV
-    std::string command = "ffmpeg -i \"" + inputPath + "\" -f wav -y \"" + tempPath + "\"";
-    int result = system(command.c_str());
-    if (result != 0) throw std::runtime_error("Failed to complete FFmpeg conversion - FFmpeg conversion failed");
+    std::string command = "ffmpeg -i \"" + inputPath + "\" -f wav -y \"" + tempPath + "\" 2>&1";
+    FILE* pipe = popen(command.c_str(), "r");
+    if (!pipe) throw std::runtime_error("Failed to start FFmpeg process");
+
+    char buffer[256];
+    while (fgets(buffer, sizeof(buffer), pipe) != nullptr) {
+        std::string line(buffer);
+        if (!line.empty() && line.back() == '\n') {
+            line.pop_back();  // Remove trailing newline
+        }
+        Logger::g_log("libkoulouri", Logger::Level::DEBUG, "ffmpeg", line);
+    }
+
+    int result = pclose(pipe);
+    if (result != 0) throw std::runtime_error("FFmpeg conversion failed");
+
 }
 
 
 /**
  * @brief Creates the AudioPlayer and initializes PortAudio.
  *
+ * Note, while an internal logger instance is created here, it is your responsibility to instruct libkoulouri how
+ * and where it should log.
  */
-AudioPlayer::AudioPlayer() : stream(nullptr), _isPlaying(false), _isLoaded(false), volume(0) {
-    print("initializing PortAudio...");
+AudioPlayer::AudioPlayer() : logger(Logger("libkoulouri")), stream(nullptr), _isPlaying(false), _isLoaded(false), volume(0) {
+    logger.log(Logger::Level::DEBUG, "initializing PortAudio...");
     // create the buffer (to prep it for allocate)
     rawAudio = AudioBuffer();
     Pa_Initialize();
@@ -36,7 +53,7 @@ AudioPlayer::AudioPlayer() : stream(nullptr), _isPlaying(false), _isLoaded(false
  *
  */
 AudioPlayer::~AudioPlayer() {
-    print("quitting PortAudio...");
+    logger.log(Logger::Level::DEBUG, "quitting PortAudio...");
 
     stop();
     Pa_Terminate();
@@ -69,7 +86,7 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
 
     // file failed to open (as it is unsupported/unrecognized) and we're allowed to convert
     if (!file && sf_error(NULL) == 1 && allowConverision) {
-        std::cout << "Attempting conversion via FFmpeg..." << std::endl;
+        logger.log(Logger::Level::DEBUG, "Attempting conversion via FFmpeg...");
         try {
             FfmpegFile converted_file(filePath);
             file = sf_open(converted_file.file().c_str(), SFM_READ, &sfInfo);
@@ -82,8 +99,9 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
 
     if (!file) {
         int code = sf_error(nullptr);
-
-        std::cerr << "Failed to open file: " << sf_strerror(nullptr) << std::endl;
+        std::string msg = "Failed to open file: ";
+        msg += sf_strerror(nullptr);
+        logger.log(Logger::Level::ERROR, msg);
 
         if (code == 2) {
             PlayerActionResult res = PlayerActionResult(PlayerActionEnum::NOTFOUND, "No such file exists or it could not be read!");
@@ -108,14 +126,14 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     rawAudio.format = format; // <- DO NOT CHANGE THIS LINE - AudioBuffer HOLDS ITS OWN COPY!
     rawAudio.allocate(totalFrames * sfInfo.channels);
 
-    std::cout << "Final rawAudio vector size is: " << rawAudio.size() << std::endl;
+    logger.log(Logger::Level::DEBUG, "Final rawAudio vector size is: " + std::to_string(rawAudio.size()));
 
     // Read all samples into rawAudio
     sf_count_t framesRead = FormatReader::read(file, &rawAudio, totalFrames, format);
 
     if (framesRead != totalFrames) {
         std::string error = "Partial read: expected " + std::to_string(totalFrames) + ", got " + std::to_string(framesRead);
-        std::cerr << error << std::endl;
+        logger.log(Logger::Level::ERROR, error);
         sf_close(file);
         return PlayerActionResult(PlayerActionEnum::FAIL, error);
     }
@@ -131,11 +149,12 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     this->numChannels = sfInfo.channels;
     this->playbackSize = rawAudio.size();
 
-    std::cout << "Audio details are: \nsamplelrate: " << sampleRate
+    std::stringstream ss;
+    ss << "Audio details are: \nsamplelrate: " << sampleRate
               << "\nchannels: " << numChannels
               << "\nMajor format: " << formatToString(sfInfo.format & SF_FORMAT_TYPEMASK)
-              << "\nSub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[format]
-              << std::endl;
+              << "\nSub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[format];
+    logger.log(Logger::Level::INFO, ss.str());
 
     _isLoaded = true;
 
@@ -196,9 +215,9 @@ void AudioPlayer::setVolume(int volume) {
         this->volume = volume;
 
         // processAudioData();
-        std::cout << "adjusting volume to: " << volume << std::endl;
+        logger.log(Logger::Level::DEBUG, "adjusting volume to: " + std::to_string(volume));
     } else {
-        std::cout << "volume did not change! (" << volume << ")" << std::endl;
+        logger.log(Logger::Level::DEBUG, "volume did not update, for it was already: " + std::to_string(volume));
     }
 }
 
