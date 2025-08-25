@@ -4,7 +4,8 @@
 #include "libkoulouri/player.h"
 
 enum WindowType {
-    TrackList
+    TrackList,
+    QueueList
 };
 
 class CursesMainWindow {
@@ -14,10 +15,12 @@ public:
 
     int main();
     int renderBaseUi(WindowType winType);
+    void handleInternalQueue();
     static void cleanup();
 private:
     AudioPlayer player;
     const Track *currentTrack;
+    size_t queueIndex;
     const std::vector<Track*> queue;
     bool running = true;
     WindowType windowType;

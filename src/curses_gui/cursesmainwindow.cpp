@@ -16,6 +16,7 @@ CursesMainWindow::CursesMainWindow() {
     mhandler.populateMetaCache("/home/exii/Music", &mcache);
     userInput = "";
     windowType = WindowType::TrackList;
+    queueIndex = 0;
 };
 CursesMainWindow::~CursesMainWindow() = default;
 void CursesMainWindow::cleanup() {
@@ -56,6 +57,12 @@ std::string formatTime(double seconds) {
     oss << std::setw(2) << std::setfill('0') << minutes << ":"
         << std::setw(2) << std::setfill('0') << secs;
     return oss.str();
+}
+
+void CursesMainWindow::handleInternalQueue() {
+    if (player.isCompleted()) {
+        player.stop();
+    }
 }
 
 
@@ -110,6 +117,32 @@ int CursesMainWindow::main() {
     keypad(stdscr, true);
     auto menu_handler = MenuHandler();
 
+    // MENU DEFINITIONS - BEGIN
+    menu_handler.registerCallback(WindowType::QueueList, [](CursesMainWindow *win, MenuHandler *handler) {
+        int scrollOffset = 0;
+
+        while (win->running) {
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            refresh();
+
+            getmaxyx(stdscr, win->maxy, win->maxx);
+
+            for (int i=0; i < win->maxy-4; i++) {
+                move(i+1, 1);
+                try {
+                    const Track* track = win->queue.at(i+scrollOffset);
+                    std::string str = std::to_string(i+scrollOffset) + track->artist + " - " + track->title;
+                    addstr(str.c_str());
+                    clrtoeol();
+                } catch (std::out_of_range e) {
+                    // pass - queue is likely just too small
+                }
+            }
+        }
+
+        return 0;
+    });
+
     menu_handler.registerCallback(WindowType::TrackList, [](CursesMainWindow *win, MenuHandler *handler) {
         const std::vector<const Track*> byArtist = win->mcache.sortBy([](const Track& a, const Track& b) {
             return a.artist < b.artist;
@@ -143,6 +176,7 @@ int CursesMainWindow::main() {
             clrtoeol();
 
             win->renderBaseUi(win->windowType);
+            win->handleInternalQueue();
 
             int k = getch();
             if (k == ERR) {
@@ -206,8 +240,12 @@ int CursesMainWindow::main() {
         win->player.stop();
         return 0;
     });
+    // MENU DEFINITIONS - END
 
-    const int result = menu_handler.call(WindowType::TrackList, this, &menu_handler);
+    int result = 0;
+    while (running) {
+        result = menu_handler.call(windowType, this, &menu_handler);
+    }
 
     endwin();
     player.stop();
