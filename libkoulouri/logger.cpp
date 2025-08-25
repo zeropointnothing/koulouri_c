@@ -51,15 +51,25 @@ std::string Logger::levelString(const Level level) {
 std::ostream* Logger::out_ = nullptr;
 FileSink* Logger::sink_ = nullptr;
 std::function<void(Logger::Level, std::string_view)> Logger::cb_ = nullptr;
-thread_local std::string Logger::module_ = "global";
 std::mutex Logger::mutex_;
 Logger::Level Logger::verbosity_ = Level::INFO;
 
-void Logger::setModule(const std::string_view module) {
-    module_ = module;
+/**
+ * Create a new logger instance. Acts as a wrapper for static log calls.
+ *
+ * Note, if you need to quickly log something, you can also use g_log to log globally.
+ * @param moduleName The name to identify the logger
+ */
+Logger::Logger(const std::string &moduleName) {
+    module_ = moduleName;
+};
+
+
+void Logger::log(const Level level, const std::string_view message) const {
+    g_log(module_, level, message);
 }
-std::string Logger::getModule() { // ignore warnings, this does in fact change if setModule or ScopedModule name is used
-    return module_;
+void Logger::log(const Level level, const std::string_view sub, const std::string_view message) const {
+    g_log(module_, level, sub, message);
 }
 
 
@@ -68,7 +78,7 @@ void Logger::setOutput(std::ostream *out) {
 }
 void Logger::setSink(FileSink *sink) {
     if (sink != nullptr && !sink->isValid()) {
-        log(Level::CRITICAL, "Requested sink is invalid!");
+        g_log("FileSink", Level::CRITICAL, "Requested sink is invalid!");
         return;
     }
     sink_ = sink;
@@ -81,12 +91,12 @@ void Logger::setCallback(const std::function<void(Level, std::string_view)> &cb)
     cb_ = cb;
 }
 
-void Logger::log(const Level level, const std::string_view message) {
+void Logger::g_log(std::string_view module, const Level level, const std::string_view message) {
     if (cb_ != nullptr) {
         cb_(level, message);
     } else {
         std::lock_guard lock(mutex_); // thread safety
-        const std::string msg = "[" + module_ + "::" + levelString(level) + "] " + message.data();
+        const std::string msg = "[" + std::string(module.data()) + "::" + levelString(level) + "] " + message.data();
 
         if (out_ != nullptr && level >= verbosity_) {
             (*out_) << msg << std::endl;
@@ -97,12 +107,12 @@ void Logger::log(const Level level, const std::string_view message) {
     }
 }
 
-void Logger::log(const Level level, const std::string_view sub, const std::string_view message) {
+void Logger::g_log(std::string_view module, const Level level, const std::string_view sub, const std::string_view message) {
     if (cb_ != nullptr) {
         cb_(level, message);
     } else {
         std::lock_guard lock(mutex_); // thread safety
-        const std::string msg = "[" + module_ + "." + sub.data() + "::" + levelString(level) + "] " + message.data();
+        const std::string msg = "[" + std::string(module.data()) + "." + sub.data() + "::" + levelString(level) + "] " + message.data();
 
         if (out_ != nullptr && level >= verbosity_) {
             (*out_) << msg << std::endl;

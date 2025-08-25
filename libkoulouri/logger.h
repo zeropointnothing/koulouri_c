@@ -45,10 +45,17 @@ public:
         CRITICAL // program critical errors - typically unrecoverable and should not be ignored
     };
 
+    explicit Logger(const std::string &moduleName);
+    void log(Level level, std::string_view message) const;
+    void log(Level level, std::string_view sub, std::string_view message) const;
+
+    // Global logs
+
+    static void g_log(std::string_view module, Level level, std::string_view message);
+    static void g_log(std::string_view module, Level level, std::string_view sub, std::string_view message);
+
     static std::string levelString(Level level);
 
-    static void log(Level level, std::string_view message);
-    static void log(Level level, std::string_view sub, std::string_view message);
     static void setVerbosity(Level level);
     static void setCallback(const std::function<void(Level, std::string_view)> &cb);
 
@@ -64,41 +71,34 @@ public:
      */
     static void setSink(FileSink* sink);
 
-    /**
-     * Set the 'module' name. Should be short, yet descriptive. Used ScopedModuleName if you aren't on a new thread.
-     * @param module
-     */
-    static void setModule(std::string_view module);
-    // Get the current 'module' name.
-    static std::string getModule();
-
 private:
+    std::string module_; // current module
+
     static std::mutex mutex_; // thread-safe lock
     static std::ostream* out_; // primary output
     static FileSink* sink_; // secondary output
-    static thread_local std::string module_; // current (thread) module
     static Level verbosity_; // minimum level required for logging
     static std::function<void(Level, std::string_view)> cb_; // logger override
 };
 
-/**
- * Basic module name scope manager.
- *
- * Automatically sets the 'module name' for the logger for this thread, then sets it back once destroyed.
- * Note, this is only required when you need to change the module name for the same thread, as the variable is defined
- * with thread_local.
- */
-class ScopedModuleName {
-public:
-    explicit ScopedModuleName(std::string_view newName)
-        : previous_(Logger::getModule()) {
-        Logger::setModule(newName);
-    }
-
-    ~ScopedModuleName() {
-        Logger::setModule(previous_);
-    }
-
-private:
-    std::string previous_;
-};
+// /**
+//  * Basic module name scope manager.
+//  *
+//  * Automatically sets the 'module name' for the logger for this thread, then sets it back once destroyed.
+//  * Note, this is only required when you need to change the module name for the same thread, as the variable is defined
+//  * with thread_local.
+//  */
+// class ScopedModuleName {
+// public:
+//     explicit ScopedModuleName(std::string_view newName)
+//         : previous_(Logger::getModule()) {
+//         Logger::setModule(newName);
+//     }
+//
+//     ~ScopedModuleName() {
+//         Logger::setModule(previous_);
+//     }
+//
+// private:
+//     std::string previous_;
+// };
