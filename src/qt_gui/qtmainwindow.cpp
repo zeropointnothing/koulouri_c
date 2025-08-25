@@ -6,6 +6,7 @@
 #include <QUrl>
 #include <qmessagebox.h>
 #include <random>
+#include <sstream>
 #include <QtConcurrent/QtConcurrent>
 
 // using namespace QtGui;
@@ -28,6 +29,7 @@ QtMainWindow::QtMainWindow(QWidget *parent)
     , ui(new Ui::QtMainWindow)
     , player(AudioPlayer())
     , PATH(getenv("KOULOURI_PLAYFILE") ? : "SET KOULOURI_PLAYFILE!!")
+    , logger(Logger("frontend"))
 {
     ui->setupUi(this);
     initializePlaybackUI();
@@ -62,7 +64,7 @@ void QtMainWindow::updateProgressBar() {
  * Most, if not all connections to UI elements should be handled here for clarity.
  */
 void QtMainWindow::initializePlaybackUI() {
-    qDebug() << "Getting ready...";
+    logger.log(Logger::Level::INFO, "Getting ready...");
 
     progressUpdateTimer = new QTimer(this);
     connect(progressUpdateTimer, &QTimer::timeout, this, &QtMainWindow::updateProgressBar);
@@ -117,7 +119,7 @@ void QtMainWindow::initializePlaybackUI() {
                 if (!player.isLoaded()) {
                     PlayerActionResult result = player.load(PATH, hasseen_conversionMessage);
                     if (result.result == PlayerActionEnum::NOTSUPPORTED) {
-                        std::cout << "prompting conversion..." << std::endl;
+                        logger.log(Logger::Level::DEBUG, "prompting conversion...");
                         QMetaObject::invokeMethod(this, [this]{setPlaybackState(PlaybackState::Prompting_conversion);});
                         return;
                     } else if (result.result != PlayerActionEnum::PASS) {
@@ -216,12 +218,10 @@ void QtMainWindow::initializePlaybackUI() {
 }
 
 void QtMainWindow::stopPlayback() {
-    qDebug() << "clicked stop!";
     setPlaybackState(PlaybackState::Aborted); // let our switch/case handle cleanup
 }
 
 void QtMainWindow::togglePlayback() {
-    qDebug() << "clicked play/pause!";
 
     // can't switch states of nothing is playing.
     if (!player.isLoaded()) {
@@ -230,7 +230,9 @@ void QtMainWindow::togglePlayback() {
 
     bool playing = player.isPlaying();
     playing ? player.pause() : player.resume();
-    qDebug() << "Changed state from '" << (playing ? "Playing" : "Paused") << "' to '" << (!playing ? "Playing" : "Paused") << "'!";
+    std::stringstream ss;
+    ss << "Changed state from '" << (playing ? "Playing" : "Paused") << "' to '" << (!playing ? "Playing" : "Paused") << "'!";
+    logger.log(Logger::Level::DEBUG, ss.str());
 }
 
 void QtMainWindow::startPlayback() {

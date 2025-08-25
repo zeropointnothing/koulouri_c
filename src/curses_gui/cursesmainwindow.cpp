@@ -9,6 +9,7 @@
 #include <locale>
 #include <sstream>
 
+#include "libkoulouri/logger.h"
 #include "libkoulouri/player.h"
 
 CursesMainWindow::CursesMainWindow() {

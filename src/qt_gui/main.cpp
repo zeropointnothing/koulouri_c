@@ -13,9 +13,13 @@ int main(int argc, char *argv[]) {
         AlsaSilencer::supressAlsa(); // on systems that support it, force ALSA to zip it with the PCM errors
     }
 
+    Logger log = Logger("main");
+    Logger::setVerbosity(Logger::Level::DEBUG);
+    Logger::setOutput(&std::cout);
     QApplication a(argc, argv);
     QtMainWindow w;
 
+    log.log(Logger::Level::INFO, "Hello, world!");
     w.show();
     return a.exec();
     return 0;

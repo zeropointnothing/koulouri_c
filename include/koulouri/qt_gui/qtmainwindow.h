@@ -29,6 +29,7 @@ class QtMainWindow : public QMainWindow
 public:
     QtMainWindow(QWidget *parent = nullptr);
     AudioPlayer player;
+    Logger logger;
     MetaHandler mhandler;
     MetaCache mcache;
     const std::string PATH;
