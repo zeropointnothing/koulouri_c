@@ -113,6 +113,7 @@ public:
     void setVolume(int volume);
     int getVolume();
     bool isLoaded();
+    bool isCompleted();
     bool isPlaying();
 
     size_t getPos() const { return playbackPos; };
@@ -146,8 +147,10 @@ private:
 
 
     PaStream *stream;
-    bool _isPlaying;
-    bool _isLoaded;
+    bool _isPlaying; // playing audio - data loaded
+    bool _isComplete; // done playing audio - data still loaded
+    bool _isPaused; // not playing audio - data still loaded
+    bool _isLoaded; // audio loaded
     std::string currentPath;
 
     // std::vector<int16_t> rawAudio;

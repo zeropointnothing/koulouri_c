@@ -181,13 +181,23 @@ PlayerActionResult AudioPlayer::play() {
 
     Pa_OpenStream(&stream, nullptr, &outputParams, sampleRate,
                   1024, paClipOff, audioCallback, this);
+    // Automatically set the 'isComplete' flag once playback stops (unless paused)
+    Pa_SetStreamFinishedCallback(stream, [](void *userData) {
+        if (auto* player = static_cast<AudioPlayer *>(userData); !player->_isPaused) {
+            player->_isComplete = true;
+        };
+    });
     Pa_StartStream(stream);
-    _isPlaying = true;
+    _isPlaying = true; // audio playback starts here
+    _isPaused = false; // this resets the paused state anyway
+    _isComplete = false; // audio (shouldn't) be marked 'complete' after playback start
+
     return PlayerActionResult(true);
 }
 
 PlayerActionResult AudioPlayer::pause() {
     if (stream && _isPlaying) {
+        _isPaused = true;
         Pa_StopStream(stream);
         _isPlaying = false;
         return PlayerActionResult(true);
@@ -197,6 +207,8 @@ PlayerActionResult AudioPlayer::pause() {
 
 PlayerActionResult AudioPlayer::resume() {
     if (stream && !_isPlaying) {
+        _isPaused = false;
+        _isComplete = false; // resuming restarts the stream
         Pa_StartStream(stream);
         _isPlaying = true;
         return PlayerActionResult(true);
@@ -233,6 +245,11 @@ bool AudioPlayer::isLoaded() {
     return this->_isLoaded;
 }
 
+bool AudioPlayer::isCompleted() {
+    return this->_isComplete;
+}
+
+
 void AudioPlayer::stop() {
     if (stream) {
         Pa_StopStream(stream);
@@ -242,8 +259,11 @@ void AudioPlayer::stop() {
     if (!rawAudio.empty()) {
         rawAudio.clear();
     }
+
     _isPlaying = false;
     _isLoaded = false;
+    _isPaused = false;
+    _isComplete = false; // no data - should pretend we aren't complete for safety
     playbackPos = 0; // reset the 'play head'
 }
 
