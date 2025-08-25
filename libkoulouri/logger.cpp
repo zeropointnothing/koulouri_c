@@ -97,3 +97,20 @@ void Logger::log(const Level level, const std::string_view message) {
     }
 }
 
+void Logger::log(const Level level, const std::string_view sub, const std::string_view message) {
+    if (cb_ != nullptr) {
+        cb_(level, message);
+    } else {
+        std::lock_guard lock(mutex_); // thread safety
+        const std::string msg = "[" + module_ + "." + sub.data() + "::" + levelString(level) + "] " + message.data();
+
+        if (out_ != nullptr && level >= verbosity_) {
+            (*out_) << msg << std::endl;
+        }
+        if (sink_ != nullptr && level >= verbosity_) {
+            sink_->write(msg);
+        }
+    }
+}
+
+

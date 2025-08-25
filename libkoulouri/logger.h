@@ -48,6 +48,7 @@ public:
     static std::string levelString(Level level);
 
     static void log(Level level, std::string_view message);
+    static void log(Level level, std::string_view sub, std::string_view message);
     static void setVerbosity(Level level);
     static void setCallback(const std::function<void(Level, std::string_view)> &cb);
 
