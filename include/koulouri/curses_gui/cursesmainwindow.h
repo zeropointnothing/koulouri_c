@@ -21,7 +21,7 @@ private:
     AudioPlayer player;
     const Track *currentTrack;
     size_t queueIndex;
-    const std::vector<Track*> queue;
+    std::vector<const Track*> queue;
     bool running = true;
     WindowType windowType;
     std::string userInput;

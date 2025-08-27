@@ -63,6 +63,23 @@ void CursesMainWindow::handleInternalQueue() {
     if (player.isCompleted()) {
         player.stop();
     }
+
+    if (!player.isLoaded() && queueIndex < queue.size()) {
+        try {
+            const Track* track = queue.at(queueIndex);
+            queueIndex++;
+            player.stop();
+            // endwin();
+            PlayerActionResult load = player.load(track->filePath, true);
+            if (load.result == PlayerActionEnum::PASS) {
+                player.setVolume(70);
+                player.play();
+                currentTrack = track;
+            }
+        } catch (std::out_of_range &e) {
+            queueIndex = 0; // assume queue was cleared, or we've hit the end (++ would put us over)
+        }
+    }
 }
 
 
@@ -78,6 +95,7 @@ int CursesMainWindow::renderBaseUi(const WindowType winType) {
     title += " / ";
     switch (winType) {
         case WindowType::TrackList: {title += "tracks"; break;}
+        case WindowType::QueueList: {title += "queue"; break;}
         default: {title += "unknown (report to dev!)"; break;}
     }
     title += " / volume: " + std::to_string(player.getVolume()) + " ]";
@@ -131,13 +149,16 @@ int CursesMainWindow::main() {
                 move(i+1, 1);
                 try {
                     const Track* track = win->queue.at(i+scrollOffset);
-                    std::string str = std::to_string(i+scrollOffset) + track->artist + " - " + track->title;
+                    std::string str = std::to_string(i+scrollOffset) + " " + track->artist + " - " + track->title;
                     addstr(str.c_str());
                     clrtoeol();
                 } catch (std::out_of_range e) {
                     // pass - queue is likely just too small
                 }
             }
+
+            win->handleInternalQueue();
+            win->renderBaseUi(win->windowType);
         }
 
         return 0;
@@ -211,14 +232,7 @@ int CursesMainWindow::main() {
                 try {
                     const long trackNumber = stol(win->userInput);
                     try {
-                        win->player.stop();
-                        // endwin();
-                        PlayerActionResult load = win->player.load(byArtist.at(trackNumber)->filePath, true);
-                        if (load.result == PlayerActionEnum::PASS) {
-                            win->player.setVolume(70);
-                            win->player.play();
-                            win->currentTrack = byArtist.at(trackNumber);
-                        }
+                        win->queue.insert(win->queue.end(), byArtist.at(trackNumber));
                         // initscr();
                     } catch (std::out_of_range &e) {
                         // pass - was out of range
@@ -229,8 +243,12 @@ int CursesMainWindow::main() {
                 } catch (std::invalid_argument &e) {
                     // pass, no need to do anything here
                 }
-            } else if (isascii(k)) {
+            } else if (isdigit(k)) {
                 win->userInput += static_cast<char>(k);
+            } else if (isascii(k) && k == 'q') {
+                win->windowType = QueueList;
+                clear();
+                return 0;
             }
 
             // refreshes the screen
