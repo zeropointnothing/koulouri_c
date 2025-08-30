@@ -150,10 +150,10 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     this->playbackSize = rawAudio.size();
 
     std::stringstream ss;
-    ss << "Audio details are: \nsamplelrate: " << sampleRate
-              << "\nchannels: " << numChannels
-              << "\nMajor format: " << formatToString(sfInfo.format & SF_FORMAT_TYPEMASK)
-              << "\nSub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[format];
+    ss << "Audio details are: Sample Rate: " << sampleRate
+              << ", Channels: " << numChannels
+              << ", Major format: " << formatToString(sfInfo.format & SF_FORMAT_TYPEMASK)
+              << ", Sub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[format];
     logger.log(Logger::Level::INFO, ss.str());
 
     _isLoaded = true;
