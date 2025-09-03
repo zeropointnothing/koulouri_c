@@ -56,7 +56,7 @@ const std::unordered_map<std::string, Track>& MetaCache::getCache() const {
  * @param key The function to sort with
  * @return
  */
-std::vector<const Track*> MetaCache::sortBy(const SortKey &key) const {
+std::vector<const Track*> MetaCache::sortBy(const std::function<bool(const Track&, const Track&)> &key) const {
     std::vector<const Track*> result; // ensure integrity by forbidding changes
     result.reserve(cache_.size());
     for (const auto &[id, track] : cache_) {

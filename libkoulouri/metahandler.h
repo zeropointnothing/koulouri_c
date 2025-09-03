@@ -29,8 +29,7 @@ public:
 
     void setCache(std::unordered_map<std::string, Track>&& newCache);
     const std::unordered_map<std::string, Track>& getCache() const;
-    using SortKey = std::function<bool(const Track&, const Track&)>;
-    std::vector<const Track*> sortBy(const SortKey &key) const;
+    std::vector<const Track*> sortBy(const std::function<bool(const Track&, const Track&)> &key) const;
 
 private:
     std::unordered_map<std::string, Track> cache_;
