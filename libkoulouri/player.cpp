@@ -166,8 +166,6 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
  * @brief Assuming a file has been loaded via `load()`, plays the file.
  *
  * Volume should be set first, as it defaults to 0.
- *
- * Assumes the file is a 16bit PCM WAV file.
  */
 PlayerActionResult AudioPlayer::play() {
     if (rawAudio.empty()) return PlayerActionResult(PlayerActionEnum::NOTREADY, "Current audio buffer is empty. Nothing to play!");
