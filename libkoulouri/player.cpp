@@ -59,18 +59,20 @@ AudioPlayer::~AudioPlayer() {
     Pa_Terminate();
 }
 
-std::string formatToString(int format) {
-    switch (format & SF_FORMAT_SUBMASK) {
-    case SF_FORMAT_PCM_16: return "PCM 16-bit";
-    case SF_FORMAT_PCM_24: return "PCM 24-bit";
-    case SF_FORMAT_PCM_32: return "PCM 32-bit";
-    case SF_FORMAT_FLOAT:  return "Float 32-bit";
-    case SF_FORMAT_DOUBLE: return "Float 64-bit";
-    case SF_FORMAT_ULAW:   return "μ-law";
-    case SF_FORMAT_ALAW:   return "A-law";
-    case SF_FORMAT_MPEG_LAYER_III:    return "MP3";
-    case SF_FORMAT_VORBIS: return "Ogg Vorbis";
-    case SF_FORMAT_FLAC:   return "FLAC";
+std::string formatToString(const int format) {
+    // check with both FORMAT_SUBMASK and FORMAT_TYPEMASK, since this information is present in the same integer
+    switch (( format & SF_FORMAT_SUBMASK | format & SF_FORMAT_TYPEMASK )) {
+        case SF_FORMAT_PCM_16: return "PCM 16-bit";
+        case SF_FORMAT_PCM_24: return "PCM 24-bit";
+        case SF_FORMAT_PCM_32: return "PCM 32-bit";
+        case SF_FORMAT_FLOAT:  return "Float 32-bit";
+        case SF_FORMAT_DOUBLE: return "Float 64-bit";
+        case SF_FORMAT_ULAW:   return "μ-law";
+        case SF_FORMAT_ALAW:   return "A-law";
+        case SF_FORMAT_MPEG_LAYER_III:    return "MP3";
+        case SF_FORMAT_VORBIS: return "Ogg Vorbis";
+        case SF_FORMAT_FLAC:   return "FLAC";
+        case SF_FORMAT_WAV:    return "WAV";
     default: return "Unknown";
     }
 }
