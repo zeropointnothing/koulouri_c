@@ -1,4 +1,7 @@
-add_library(koulouri_shared STATIC alsasilencer.cpp)
+add_library(koulouri_shared STATIC alsasilencer.cpp
+        cmdparser.h
+        cmdparser.cpp
+        )
 
 # not all systems use ALSA, we should account for this!
 find_library(ALSA_LIB NAMES asound)
