@@ -86,6 +86,8 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     SF_INFO sfInfo;
     SNDFILE* file = sf_open(filePath.c_str(), SFM_READ, &sfInfo);
 
+    logger.log(Logger::Level::INFO, "Loading: " + filePath);
+
     // file failed to open (as it is unsupported/unrecognized) and we're allowed to convert
     if (!file && sf_error(NULL) == 1 && allowConverision) {
         logger.log(Logger::Level::DEBUG, "Attempting conversion via FFmpeg...");
