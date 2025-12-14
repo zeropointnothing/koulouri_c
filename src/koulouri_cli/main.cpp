@@ -1,17 +1,21 @@
 #include <iostream>
 #include <thread>
 #include <variant>
+#include "libkoulouri/logger.h"
 #include "libkoulouri/player.h"
 #include "koulouri_shared/alsasilencer.h"
 #include "koulouri_shared/cmdparser.h"
 
 int main(int argc, char* argv[]) {
+    Logger::setOutput(&std::cerr);
+
     const char* file = nullptr; // be safe!!!
 
     CmdParser cmd;
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
     cmd.register_argument({"-p", "--play", ArgType::VALUE});
+    cmd.register_argument({"-d", "--debug", ArgType::SWITCH});
 
     ParseResult parsed = cmd.parse_args(argc, argv);
 
@@ -34,13 +38,18 @@ int main(int argc, char* argv[]) {
             file = *val; // we get a pointer back from get_if
         }
     }
+    if (auto opt = parsed.get("--debug")) {
+        ArgResult &res = *opt;
+
+        Logger::setVerbosity(Logger::Level::DEBUG);
+        Logger::g_log("cli", Logger::Level::DEBUG, "DEBUG logging is ON!");
+    } else {
+        Logger::setVerbosity(Logger::Level::INFO);
+    }
 
     if (!getenv("KOULOURI_ALLOW_ALSAWHINE")) {
         AlsaSilencer::supressAlsa();
     }
-
-    Logger::setOutput(&std::cerr);
-    Logger::setVerbosity(Logger::Level::DEBUG);
 
     if (file != nullptr) {
         AudioPlayer player;
