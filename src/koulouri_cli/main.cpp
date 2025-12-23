@@ -19,27 +19,25 @@ int main(int argc, char* argv[]) {
 
     ParseResult parsed = cmd.parse_args(argc, argv);
 
-    if (auto opt = parsed.get("--help")) {
-        ArgResult &res = *opt;
+    if (auto lst = parsed.get("--help"); !lst.empty()) {
+        ArgResult &res = lst.at(0);
 
-        try {
-            std::cout << res.arg.cswitch_long << " | " << std::get<bool>(res.value) << std::endl;
-        } catch (std::bad_variant_access e) {
-            std::cout << "fail: " << e.what() << std::endl;
+        if (auto val = std::get_if<bool>(&res.value)) {
+            std::cout << res.arg.cswitch_long << " | " << *val << std::endl;
         }
-
-        return 0;
     }
-    if (auto opt = parsed.get("--play")) {
-        ArgResult &res = *opt; // obtain a reference to the ArgResult
+
+    if (auto lst = parsed.get("--play"); !lst.empty()) {
+        ArgResult &res = lst.at(0);
 
         if (auto val = std::get_if<char*>(&res.value)) { // pass a reference to the value contained
-            std::cout << res.arg.cswitch_long << " | " << *val << std::endl;
+            std::cout << "PLAY: " << *val << std::endl;
             file = *val; // we get a pointer back from get_if
         }
     }
-    if (auto opt = parsed.get("--debug")) {
-        ArgResult &res = *opt;
+
+    if (auto lst = parsed.get("--debug"); !lst.empty()) {
+        // no point in getting 'res', since we do nothing with the value...
 
         Logger::setVerbosity(Logger::Level::DEBUG);
         Logger::g_log("cli", Logger::Level::DEBUG, "DEBUG logging is ON!");
@@ -56,7 +54,7 @@ int main(int argc, char* argv[]) {
         PlayerActionResult result = player.load(file, true);
 
         if (result.result == PlayerActionEnum::PASS) {
-            player.setVolume(70);
+            player.setVolume(60);
             PlayerActionResult play = player.play();
 
             while (!player.isCompleted()) {

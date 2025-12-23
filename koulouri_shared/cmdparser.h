@@ -3,13 +3,13 @@
 #include <cstdlib>
 #include <cstring>
 #include <iostream>
-#include <optional>
 #include <variant>
 #include <vector>
 
 enum ArgType {
     SWITCH, // Toggle. Presence acts as a value.
-    VALUE // Contains a value.
+    VALUE, // Contains a value.
+    APPEND // All instances should be grouped. Acts like `VALUE` otherwise.
 };
 
 struct Argument {
@@ -29,10 +29,13 @@ class ParseResult {
     ParseResult(std::vector<ArgResult> results) : results(results) {};
 
     /**
-     * Attempt to fetch the ArgResult struct that represents a given argument
+     * Attempt to fetch the ArgResult struct(s) that represents a given argument
      * if it exists and was supplied by the user.
+     *
+     * Note, while all results will return a vector, only 'APPEND' types will actually
+     * use it. For most, simply calling .at(0) will suffice.
      */
-    std::optional<ArgResult> get(const char* name);
+    std::vector<ArgResult> get(const char* name); // TODO: Find better way to go about this. std::variant?
 
     private:
     const std::vector<ArgResult> results;
