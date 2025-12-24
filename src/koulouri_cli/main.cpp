@@ -1,4 +1,5 @@
 #include <iostream>
+#include <stdexcept>
 #include <thread>
 #include <variant>
 #include "libkoulouri/logger.h"
@@ -10,12 +11,14 @@ int main(int argc, char* argv[]) {
     Logger::setOutput(&std::cerr);
 
     const char* file = nullptr; // be safe!!!
+    int volume = 70;
 
     CmdParser cmd;
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
     cmd.register_argument({"-p", "--play", ArgType::VALUE});
     cmd.register_argument({"-d", "--debug", ArgType::SWITCH});
+    cmd.register_argument({"-v", "--volume", ArgType::VALUE});
 
     ParseResult parsed = cmd.parse_args(argc, argv);
 
@@ -33,6 +36,19 @@ int main(int argc, char* argv[]) {
         if (auto val = std::get_if<char*>(&res.value)) { // pass a reference to the value contained
             std::cout << "PLAY: " << *val << std::endl;
             file = *val; // we get a pointer back from get_if
+        }
+    }
+
+    if (auto lst = parsed.get("--volume"); !lst.empty()) {
+        ArgResult &res = lst.at(0);
+
+        if (auto val = std::get_if<char*>(&res.value)) {
+            std::cout << *val << std::endl;
+            try {
+                volume = std::stoi(*val);
+            } catch (std::invalid_argument e) {
+                std::cerr << "Bad argument! : " << e.what() << " - '" << *val << "' is not a valid integer!" << std::endl;
+            }
         }
     }
 
@@ -54,7 +70,7 @@ int main(int argc, char* argv[]) {
         PlayerActionResult result = player.load(file, true);
 
         if (result.result == PlayerActionEnum::PASS) {
-            player.setVolume(60);
+            player.setVolume(volume);
             PlayerActionResult play = player.play();
 
             while (!player.isCompleted()) {
