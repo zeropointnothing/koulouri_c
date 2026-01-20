@@ -53,9 +53,9 @@ AudioPlayer::AudioPlayer() : logger(Logger("libkoulouri")), stream(nullptr), _is
  *
  */
 AudioPlayer::~AudioPlayer() {
-    logger.log(Logger::Level::DEBUG, "quitting PortAudio...");
-
+    logger.log(Logger::Level::DEBUG, "Running cleanup...");
     stop();
+    logger.log(Logger::Level::DEBUG, "Quitting PortAudio...");
     Pa_Terminate();
 }
 
@@ -90,11 +90,13 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
 
     // file failed to open (as it is unsupported/unrecognized) and we're allowed to convert
     if (!file && sf_error(NULL) == 1 && allowConverision) {
-        logger.log(Logger::Level::DEBUG, "Attempting conversion via FFmpeg...");
+        logger.log(Logger::Level::WARNING, "File is unsupported/unknown format!");
+        logger.log(Logger::Level::INFO, "Attempting conversion via FFmpeg...");
         try {
             FfmpegFile converted_file(filePath);
             file = sf_open(converted_file.file().c_str(), SFM_READ, &sfInfo);
         } catch (std::runtime_error e){
+            logger.log(Logger::Level::ERROR, "FFmpeg could not be located or failed to convert!");
             std::string msg = "FFmpeg could not be located or it failed to convert the file. | ";
             msg.append(e.what()).append("");
             return PlayerActionResult(PlayerActionEnum::FAIL, msg);
@@ -133,6 +135,7 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     logger.log(Logger::Level::DEBUG, "Final rawAudio vector size is: " + std::to_string(rawAudio.size()));
 
     // Read all samples into rawAudio
+    logger.log(Logger::Level::DEBUG, "Reading file...");
     sf_count_t framesRead = FormatReader::read(file, &rawAudio, totalFrames, format);
 
     if (framesRead != totalFrames) {
@@ -174,6 +177,7 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
 PlayerActionResult AudioPlayer::play() {
     if (rawAudio.empty()) return PlayerActionResult(PlayerActionEnum::NOTREADY, "Current audio buffer is empty. Nothing to play!");
 
+    logger.log(Logger::Level::DEBUG, "Setting up stream...");
     PaStreamParameters outputParams;
     outputParams.device = Pa_GetDefaultOutputDevice();
     outputParams.channelCount = numChannels;
@@ -181,6 +185,7 @@ PlayerActionResult AudioPlayer::play() {
     outputParams.suggestedLatency = Pa_GetDeviceInfo(outputParams.device)->defaultLowOutputLatency;
     outputParams.hostApiSpecificStreamInfo = nullptr;
 
+    logger.log(Logger::Level::DEBUG, "Opening PortAudio stream...");
     Pa_OpenStream(&stream, nullptr, &outputParams, sampleRate,
                   1024, paClipOff, audioCallback, this);
     // Automatically set the 'isComplete' flag once playback stops (unless paused)
@@ -189,6 +194,7 @@ PlayerActionResult AudioPlayer::play() {
             player->_isComplete = true;
         };
     });
+    logger.log(Logger::Level::DEBUG, "Starting stream!");
     Pa_StartStream(stream);
     _isPlaying = true; // audio playback starts here
     _isPaused = false; // this resets the paused state anyway
@@ -199,6 +205,7 @@ PlayerActionResult AudioPlayer::play() {
 
 PlayerActionResult AudioPlayer::pause() {
     if (stream && _isPlaying) {
+        logger.log(Logger::Level::DEBUG, "Pausing!");
         _isPaused = true;
         Pa_StopStream(stream);
         _isPlaying = false;
@@ -209,6 +216,7 @@ PlayerActionResult AudioPlayer::pause() {
 
 PlayerActionResult AudioPlayer::resume() {
     if (stream && !_isPlaying) {
+        logger.log(Logger::Level::DEBUG, "Resuming!");
         _isPaused = false;
         _isComplete = false; // resuming restarts the stream
         Pa_StartStream(stream);
@@ -253,6 +261,7 @@ bool AudioPlayer::isCompleted() {
 
 
 void AudioPlayer::stop() {
+    logger.log(Logger::Level::DEBUG, ".stop() called, resetting state!");
     if (stream) {
         Pa_StopStream(stream);
         Pa_CloseStream(stream);
