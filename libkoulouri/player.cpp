@@ -3,6 +3,7 @@
 #include <portaudio.h>
 #include <cstring>
 #include <algorithm>
+#include <sndfile.h>
 #include <sstream>
 #include "logger.h"
 
@@ -82,14 +83,20 @@ std::string formatToString(const int format) {
  *
  * Does not automatically play the file.
  */
-PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConverision) {
+PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConverision, bool forceConversion) {
     SF_INFO sfInfo;
-    SNDFILE* file = sf_open(filePath.c_str(), SFM_READ, &sfInfo);
+    SNDFILE* file = nullptr;
+
+    if (!forceConversion) {
+        file = sf_open(filePath.c_str(), SFM_READ, &sfInfo);
+    } else {
+        logger.log(Logger::Level::INFO, "Forcing conversion!");
+    }
 
     logger.log(Logger::Level::INFO, "Loading: " + filePath);
 
     // file failed to open (as it is unsupported/unrecognized) and we're allowed to convert
-    if (!file && sf_error(NULL) == 1 && allowConverision) {
+    if ((!file && sf_error(NULL) == 1 && allowConverision) || forceConversion) {
         logger.log(Logger::Level::WARNING, "File is unsupported/unknown format!");
         logger.log(Logger::Level::INFO, "Attempting conversion via FFmpeg...");
         try {

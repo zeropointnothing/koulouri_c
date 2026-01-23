@@ -105,7 +105,7 @@ public:
     AudioPlayer();
     ~AudioPlayer();
 
-    PlayerActionResult load(const std::string& filePath, bool allowConverision);
+    PlayerActionResult load(const std::string& filePath, bool allowConverision, bool forceConversion = false);
     PlayerActionResult play();
     PlayerActionResult pause();
     PlayerActionResult resume();
