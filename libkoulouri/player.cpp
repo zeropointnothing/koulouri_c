@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <sndfile.h>
 #include <sstream>
+#include <string>
 #include "logger.h"
 
 FfmpegFile::FfmpegFile(const std::string &inputPath) {
@@ -143,13 +144,24 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
 
     // Read all samples into rawAudio
     logger.log(Logger::Level::DEBUG, "Reading file...");
+    // TODO: Discard sfinfo.frames entirely and use a read loop instead
     sf_count_t framesRead = FormatReader::read(file, &rawAudio, totalFrames, format);
 
+    // If audio data made it, this is fine. We can simply adjust!
     if (framesRead != totalFrames) {
-        std::string error = "Partial read: expected " + std::to_string(totalFrames) + ", got " + std::to_string(framesRead);
+        std::string error = "Partial read! Expected " + std::to_string(totalFrames) + ", got " + std::to_string(framesRead);
         logger.log(Logger::Level::ERROR, error);
-        sf_close(file);
-        return PlayerActionResult(PlayerActionEnum::FAIL, error);
+        logger.log(Logger::Level::WARNING, "File is likely corrupt or missing proper headers!");
+        logger.log(Logger::Level::WARNING, "Trusting decoded data...");
+
+        // adjust internal variables to match decoded data
+        totalFrames = framesRead;
+        rawAudio.resize((totalFrames*sfInfo.channels), true);
+
+        logger.log(Logger::Level::DEBUG, "rawAudio size is now: " + std::to_string(rawAudio.size()));
+
+        // sf_close(file);
+        // return PlayerActionResult(PlayerActionEnum::FAIL, error);
     }
 
     // Manually clamp the floats into int16 (should ensure we avoid clipping).
