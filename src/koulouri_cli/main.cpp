@@ -1,5 +1,6 @@
 #include <atomic>
 #include <deque>
+#include <filesystem>
 #include <iostream>
 #include <stdexcept>
 #include <string>
@@ -35,6 +36,7 @@ int main(int argc, char* argv[]) {
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
     cmd.register_argument({"-p", "--play", ArgType::APPEND});
+    cmd.register_argument({"-pd", "--playdir", ArgType::APPEND});
     cmd.register_argument({"-d", "--debug", ArgType::SWITCH});
     cmd.register_argument({"-v", "--volume", ArgType::VALUE});
 
@@ -59,6 +61,21 @@ int main(int argc, char* argv[]) {
         //     std::cout << "PLAY: " << *val << std::endl;
         //     file = *val; // we get a pointer back from get_if
         // }
+    }
+
+    if (auto lst = parsed.get("--playdir"); !lst.empty()) {
+        for (ArgResult &res : lst) {
+            if (auto val = std::get_if<char*>(&res.value)) {
+                try {
+                    for (const auto &entry : std::filesystem::recursive_directory_iterator(*val)) {
+                        if (entry.is_directory()) {continue;} // skip directories
+                        queue.push_back(entry.path());
+                    }
+                } catch (std::filesystem::filesystem_error) {
+                    std::cerr << "No such directory: " << *val << std::endl;
+                }
+            }
+        }
     }
 
     if (auto lst = parsed.get("--volume"); !lst.empty()) {
