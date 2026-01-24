@@ -1,22 +1,40 @@
+#include <atomic>
+#include <deque>
 #include <iostream>
 #include <stdexcept>
+#include <string>
 #include <thread>
 #include <variant>
+#include <vector>
+#include <signal.h>
 #include "libkoulouri/logger.h"
+#include "libkoulouri/metahandler.h"
 #include "libkoulouri/player.h"
 #include "koulouri_shared/alsasilencer.h"
 #include "koulouri_shared/cmdparser.h"
 
+std::atomic<bool> running = true;
+
+void handleSignal(int signal) {
+    std::cout << "Recieved quit signal!" << std::endl;
+    running.store(false);
+    // exit(0); // Exit the program
+}
+
 int main(int argc, char* argv[]) {
+    signal(SIGINT, handleSignal);
+
     Logger::setOutput(&std::cerr);
 
-    const char* file = nullptr; // be safe!!!
     int volume = 70;
 
     CmdParser cmd;
+    std::deque<std::string> queue;
+    size_t queueIndex = 0;
+
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
-    cmd.register_argument({"-p", "--play", ArgType::VALUE});
+    cmd.register_argument({"-p", "--play", ArgType::APPEND});
     cmd.register_argument({"-d", "--debug", ArgType::SWITCH});
     cmd.register_argument({"-v", "--volume", ArgType::VALUE});
 
@@ -31,12 +49,16 @@ int main(int argc, char* argv[]) {
     }
 
     if (auto lst = parsed.get("--play"); !lst.empty()) {
-        ArgResult &res = lst.at(0);
-
-        if (auto val = std::get_if<char*>(&res.value)) { // pass a reference to the value contained
-            std::cout << "PLAY: " << *val << std::endl;
-            file = *val; // we get a pointer back from get_if
+        for (ArgResult &res : lst) {
+            if (auto val = std::get_if<char*>(&res.value)) {
+                queue.push_back(*val);
+            }
         }
+
+        // if (auto val = std::get_if<char*>(&res.value)) { // pass a reference to the value contained
+        //     std::cout << "PLAY: " << *val << std::endl;
+        //     file = *val; // we get a pointer back from get_if
+        // }
     }
 
     if (auto lst = parsed.get("--volume"); !lst.empty()) {
@@ -65,26 +87,47 @@ int main(int argc, char* argv[]) {
         AlsaSilencer::supressAlsa();
     }
 
-    if (file != nullptr) {
+    if (queue.size() > 0) {
         AudioPlayer player;
-        PlayerActionResult result = player.load(file, true);
 
-        if (result.result == PlayerActionEnum::PASS) {
-            player.setVolume(volume);
-            PlayerActionResult play = player.play();
-
-            while (!player.isCompleted()) {
-                std::string out;
-                std::cin >> out;
-                if (out == "quit") {
-                    player.stop();
-                    break;
-                }
-                std::this_thread::sleep_for(std::chrono::milliseconds(100));
+        while (running.load()) {
+            if (queueIndex >= queue.size()) {
+                Logger::g_log("cli", Logger::Level::INFO, "Reached end of queue!");
+                break;
             }
-        } else {
-            std::cout << "Failed to open file '" << file << "'" << ": " << result.getFriendly() << std::endl;
+
+            const std::string &file = queue.at(queueIndex);
+
+            PlayerActionResult result = player.load(file, true);
+
+            if (result.result == PlayerActionEnum::PASS) {
+                player.setVolume(volume);
+                PlayerActionResult play = player.play();
+                const size_t maximumPos = player.getMaxPos(); // this doesn't change - get it once!
+
+                while (!player.isCompleted() && running.load()) {
+                    const size_t currentPos = player.getPos();
+
+                    // TODO: find an efficent way to round up to 2nd decimal!
+
+                    const std::string status = std::to_string(player.posToSeconds(player.getPos())) +
+                    "(" + std::to_string(currentPos) + ") " +
+                    std::to_string((static_cast<double>(currentPos) / maximumPos) * 100) + "% | " +
+                    std::to_string(player.getVolume()) + "% ";
+                    std::cout << "\r" << status;
+                    std::cout.flush();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
+                std::cout << std::endl;
+            } else {
+                std::cout << "Failed to open file '" << file << "'" << ": " << result.getFriendly() << std::endl;
+            }
+
+            player.stop();
+            queueIndex += 1;
         }
+
     }
 
     // for (int i = 1; i < argc; ++i) {
