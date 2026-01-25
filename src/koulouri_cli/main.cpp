@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <atomic>
 #include <deque>
 #include <filesystem>
@@ -24,6 +25,7 @@ void handleSignal(int signal) {
 
 int main(int argc, char* argv[]) {
     signal(SIGINT, handleSignal);
+    Logger logger("cli");
 
     Logger::setOutput(&std::cerr);
 
@@ -66,14 +68,17 @@ int main(int argc, char* argv[]) {
     if (auto lst = parsed.get("--playdir"); !lst.empty()) {
         for (ArgResult &res : lst) {
             if (auto val = std::get_if<char*>(&res.value)) {
+                std::vector<std::string> temp; // filesystem returns the wrong order
                 try {
                     for (const auto &entry : std::filesystem::recursive_directory_iterator(*val)) {
                         if (entry.is_directory()) {continue;} // skip directories
-                        queue.push_back(entry.path());
+                        temp.push_back(entry.path());
                     }
                 } catch (std::filesystem::filesystem_error) {
                     std::cerr << "No such directory: " << *val << std::endl;
                 }
+                std::sort(temp.begin(), temp.end()); // default sorting should preserve filename based order
+                queue.insert(queue.end(), temp.begin(), temp.end());
             }
         }
     }
@@ -95,7 +100,7 @@ int main(int argc, char* argv[]) {
         // no point in getting 'res', since we do nothing with the value...
 
         Logger::setVerbosity(Logger::Level::DEBUG);
-        Logger::g_log("cli", Logger::Level::DEBUG, "DEBUG logging is ON!");
+        logger.log(Logger::Level::DEBUG, "DEBUG logging is ON!");
     } else {
         Logger::setVerbosity(Logger::Level::INFO);
     }
@@ -107,9 +112,11 @@ int main(int argc, char* argv[]) {
     if (queue.size() > 0) {
         AudioPlayer player;
 
+        logger.log(Logger::Level::INFO, "Playing: " + std::to_string(queue.size()) + " tracks");
+
         while (running.load()) {
             if (queueIndex >= queue.size()) {
-                Logger::g_log("cli", Logger::Level::INFO, "Reached end of queue!");
+                logger.log(Logger::Level::INFO, "Reached end of queue!");
                 break;
             }
 
