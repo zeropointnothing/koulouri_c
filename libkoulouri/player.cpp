@@ -32,8 +32,10 @@ FfmpegFile::FfmpegFile(const std::string &inputPath) {
     }
 
     int result = pclose(pipe);
-    if (result != 0) throw std::runtime_error("FFmpeg conversion failed");
-
+    if (result != 0) {
+        std::remove(tmpTemplate); // file isn't removed if we don't continue
+        throw std::runtime_error("FFmpeg conversion failed");
+    }
 }
 
 
