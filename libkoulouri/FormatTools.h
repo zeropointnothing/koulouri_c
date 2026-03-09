@@ -1,5 +1,4 @@
 #pragma once
-#include <functional>
 #include <map>
 #include <portaudio.h>
 #include <sndfile.h>
@@ -8,6 +7,7 @@
 #include <vector>
 
 enum class FormatType {
+    Undefined, // default
     Int16,
     Int24,
     Int32,
@@ -36,7 +36,10 @@ public:
 
 class AudioBuffer {
     public:
-    FormatType format;
+    FormatType format = FormatType::Undefined;
+    int sampleRate = -1;
+    int numChannels = -1;
+
     RawBuffer data;
 
     std::vector<int16_t>& getInt16Buffer();
