@@ -11,7 +11,7 @@
 #include <signal.h>
 #include "libkoulouri/logger.h"
 #include "libkoulouri/metahandler.h"
-#include "libkoulouri/player.h"
+#include "libkoulouri/player_gappless.h"
 #include "koulouri_shared/alsasilencer.h"
 #include "koulouri_shared/cmdparser.h"
 
@@ -30,6 +30,7 @@ int main(int argc, char* argv[]) {
     Logger::setOutput(&std::cerr);
 
     int volume = 70;
+    bool shouldPreload = false;
 
     CmdParser cmd;
     std::deque<std::string> queue;
@@ -38,6 +39,7 @@ int main(int argc, char* argv[]) {
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
     cmd.register_argument({"-p", "--play", ArgType::APPEND});
+    cmd.register_argument({"-g", "--gapless", ArgType::SWITCH});
     cmd.register_argument({"-pd", "--playdir", ArgType::APPEND});
     cmd.register_argument({"-d", "--debug", ArgType::SWITCH});
     cmd.register_argument({"-v", "--volume", ArgType::VALUE});
@@ -49,6 +51,14 @@ int main(int argc, char* argv[]) {
 
         if (auto val = std::get_if<bool>(&res.value)) {
             std::cout << res.arg.cswitch_long << " | " << *val << std::endl;
+        }
+    }
+
+    if (auto lst = parsed.get("--gapless"); !lst.empty()) {
+        ArgResult &res = lst.at(0);
+
+        if (auto val = std::get_if<bool>(&res.value)) {
+            shouldPreload = true;
         }
     }
 
@@ -111,6 +121,7 @@ int main(int argc, char* argv[]) {
 
     if (queue.size() > 0) {
         AudioPlayer player;
+        bool preloaded = false;
 
         logger.log(Logger::Level::INFO, "Playing: " + std::to_string(queue.size()) + " tracks");
 
@@ -127,14 +138,50 @@ int main(int argc, char* argv[]) {
             if (result.result == PlayerActionEnum::PASS) {
                 player.setVolume(volume);
                 PlayerActionResult play = player.play();
-                const size_t maximumPos = player.getMaxPos(); // this doesn't change - get it once!
+                if (queueIndex == 0) {
+                    player.setVPos(player.getMaxVPos() - player.secondsToVPos(10));
+                }
 
-                while (!player.isCompleted() && running.load()) {
-                    const size_t currentPos = player.getPos();
+                size_t maximumPos = player.getMaxVPos(); // this doesn't change - get it once!
+
+                while (running.load()) {
+                    if (shouldPreload && player.getVPos() > (player.getMaxVPos() - player.secondsToVPos(5)) && (!preloaded && queueIndex+1 < queue.size())) {
+                        preloaded = true;
+
+                        PlayerActionResult preload = player.load(queue.at(queueIndex+1), true, false, true);
+                    }
+
+
+                    if (player.flags.trackFinished.load()) {
+                        if (player.flags.trackAdvanced.load()) { // typical preload
+                            player.flags.trackAdvanced.store(false);
+                            player.flags.trackFinished.store(false);
+                            maximumPos = player.getMaxVPos(); // until it does change >:)
+                            queueIndex++;
+
+                            preloaded = false;
+                        } else if (player.flags.trackPreloaded && player.flags.reconfigureNeeded.load()) {
+                            // preload, but we need to manually call .play() again (reconfiguration)
+                            player.flags.trackFinished.store(false);
+
+                            queueIndex++;
+                            preloaded = false;
+                            player.play();
+                        }
+
+                        else { // track ended (no preload)
+                            player.flags.trackFinished.store(false);
+                            preloaded = false;
+
+                            break;
+                        }
+                    }
+
+                    const size_t currentPos = player.getVPos();
 
                     // TODO: find an efficent way to round up to 2nd decimal!
 
-                    const std::string status = std::to_string(player.posToSeconds(player.getPos())) +
+                    const std::string status = std::to_string(player.vposToSeconds(player.getVPos())) +
                     "(" + std::to_string(currentPos) + ") " +
                     std::to_string((static_cast<double>(currentPos) / maximumPos) * 100) + "% | " +
                     std::to_string(player.getVolume()) + "% ";
