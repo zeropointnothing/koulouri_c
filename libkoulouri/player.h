@@ -118,19 +118,19 @@ public:
 
     size_t getPos() const { return playbackPos; };
     double posToSeconds(size_t raw) const {
-        return static_cast<double>(std::clamp(raw, std::size_t{0}, playbackSize)) / (sampleRate * numChannels);
+        return static_cast<double>(std::clamp(raw, std::size_t{0}, rawAudio.size())) / (rawAudio.sampleRate * rawAudio.numChannels);
     };
     size_t secondsToPos(double seconds) const {
-        return static_cast<size_t>(std::clamp(seconds, 0.0, posToSeconds(playbackSize)) * (sampleRate * numChannels));
+        return static_cast<size_t>(std::clamp(seconds, 0.0, posToSeconds(rawAudio.size())) * (rawAudio.sampleRate * rawAudio.numChannels));
     };
 
     void setPos(size_t to) {
         playbackPos = std::clamp(to, std::size_t{0}, rawAudio.size());
     };
-    size_t getMaxPos() const { return playbackSize; };
+    size_t getMaxPos() const { return rawAudio.size(); };
 
-    int getSampleRate() const { return sampleRate; };
-    int getChannels() const { return numChannels; };
+    int getSampleRate() const { return rawAudio.sampleRate; };
+    int getChannels() const { return rawAudio.numChannels; };
 
     void print(std::string text);
 
@@ -143,8 +143,6 @@ private:
                              PaStreamCallbackFlags statusFlags,
                              void *userData);
     size_t playbackPos = 0;
-    size_t playbackSize = 0;
-
 
     PaStream *stream;
     bool _isPlaying; // playing audio - data loaded
@@ -157,8 +155,7 @@ private:
     AudioBuffer rawAudio;
     // using VolumeCallback = std::function<void(const void* input, void* output, size_t samples, float volume)>;
     // std::function<void(const void* input, void* output, size_t samples, float volume)> volumeCallback;
-    int sampleRate;
-    int numChannels;
+
     int volume;
-    FormatType format;
+
 };

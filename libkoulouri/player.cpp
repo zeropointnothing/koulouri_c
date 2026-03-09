@@ -135,11 +135,10 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     // std::cout << (sf_get_string(file, SF_STR_GENRE)? : "not available") << std::endl;
 
     sf_count_t totalFrames = sfInfo.frames;
-    format = FormatTools::fromLibsndfile(sfInfo.format);
+    rawAudio.format = FormatTools::fromLibsndfile(sfInfo.format);
 
     // ALWAYS CALL .allocate!
     // AudioBuffer STORES AN INTERNAL VECTOR - FORMAT CHANGES WILL LEAD TO SEGFAULT!
-    rawAudio.format = format; // <- DO NOT CHANGE THIS LINE - AudioBuffer HOLDS ITS OWN COPY!
     rawAudio.allocate(totalFrames * sfInfo.channels);
 
     logger.log(Logger::Level::DEBUG, "Final rawAudio vector size is: " + std::to_string(rawAudio.size()));
@@ -147,7 +146,7 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     // Read all samples into rawAudio
     logger.log(Logger::Level::DEBUG, "Reading file...");
     // TODO: Discard sfinfo.frames entirely and use a read loop instead
-    sf_count_t framesRead = FormatReader::read(file, &rawAudio, totalFrames, format);
+    sf_count_t framesRead = FormatReader::read(file, &rawAudio, totalFrames, rawAudio.format);
 
     // If audio data made it, this is fine. We can simply adjust!
     if (framesRead != totalFrames) {
@@ -173,15 +172,14 @@ PlayerActionResult AudioPlayer::load(const std::string& filePath, bool allowConv
     // }
 
     sf_close(file);
-    this->sampleRate = sfInfo.samplerate;
-    this->numChannels = sfInfo.channels;
-    this->playbackSize = rawAudio.size();
+    rawAudio.sampleRate = sfInfo.samplerate;
+    rawAudio.numChannels = sfInfo.channels;
 
     std::stringstream ss;
-    ss << "Audio details are: Sample Rate: " << sampleRate
-              << ", Channels: " << numChannels
+    ss << "Audio details are: Sample Rate: " << rawAudio.sampleRate
+              << ", Channels: " << rawAudio.numChannels
               << ", Major format: " << formatToString(sfInfo.format & SF_FORMAT_TYPEMASK)
-              << ", Sub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[format];
+              << ", Sub format: " << formatToString(sfInfo.format & SF_FORMAT_SUBMASK) << ", read as " << formatTypeString[rawAudio.format];
     logger.log(Logger::Level::INFO, ss.str());
 
     _isLoaded = true;
@@ -201,13 +199,13 @@ PlayerActionResult AudioPlayer::play() {
     logger.log(Logger::Level::DEBUG, "Setting up stream...");
     PaStreamParameters outputParams;
     outputParams.device = Pa_GetDefaultOutputDevice();
-    outputParams.channelCount = numChannels;
-    outputParams.sampleFormat = FormatTools::toPortAudio[format];
+    outputParams.channelCount = rawAudio.numChannels;
+    outputParams.sampleFormat = FormatTools::toPortAudio[rawAudio.format];
     outputParams.suggestedLatency = Pa_GetDeviceInfo(outputParams.device)->defaultLowOutputLatency;
     outputParams.hostApiSpecificStreamInfo = nullptr;
 
     logger.log(Logger::Level::DEBUG, "Opening PortAudio stream...");
-    Pa_OpenStream(&stream, nullptr, &outputParams, sampleRate,
+    Pa_OpenStream(&stream, nullptr, &outputParams, rawAudio.sampleRate,
                   1024, paClipOff, audioCallback, this);
     // Automatically set the 'isComplete' flag once playback stops (unless paused)
     Pa_SetStreamFinishedCallback(stream, [](void *userData) {
@@ -317,13 +315,13 @@ int AudioPlayer::audioCallback(
         return paComplete;
     }
 
-    size_t samplesToWrite = framesPerBuffer * player->numChannels;
+    size_t samplesToWrite = framesPerBuffer * player->rawAudio.numChannels;
     size_t availableSamples = player->rawAudio.size() - player->getPos();
     samplesToWrite = std::min(samplesToWrite, availableSamples);
 
     // choose a volume adjustment function based on the format.
     // done within this callback for simplicity - shouldn't affect processing speed?
-    switch (player->format) {
+    switch (player->rawAudio.format) {
         case FormatType::Int16: {
             int16_t* out = static_cast<int16_t*>(outputBuffer);
             const int16_t* in = &player->rawAudio.getInt16Buffer()[player->getPos()];
