@@ -121,7 +121,7 @@ int main(int argc, char* argv[]) {
 
     if (queue.size() > 0) {
         AudioPlayer player;
-        bool preloaded = false;
+        int preloaded = -1;
 
         logger.log(Logger::Level::INFO, "Playing: " + std::to_string(queue.size()) + " tracks");
 
@@ -138,17 +138,26 @@ int main(int argc, char* argv[]) {
             if (result.result == PlayerActionEnum::PASS) {
                 player.setVolume(volume);
                 PlayerActionResult play = player.play();
-                if (queueIndex == 0) {
-                    player.setVPos(player.getMaxVPos() - player.secondsToVPos(10));
-                }
+                // set to 10 seconds till end (preload testing)
+                // if (queueIndex == 0) {
+                //     player.setVPos(player.getMaxVPos() - player.secondsToVPos(10));
+                // }
 
                 size_t maximumPos = player.getMaxVPos(); // this doesn't change - get it once!
 
                 while (running.load()) {
-                    if (shouldPreload && player.getVPos() > (player.getMaxVPos() - player.secondsToVPos(5)) && (!preloaded && queueIndex+1 < queue.size())) {
-                        preloaded = true;
+                    if (shouldPreload && player.getVPos() > (player.getMaxVPos() - player.secondsToVPos(5)) && (preloaded==-1 && queueIndex+1 < queue.size())) {
+                        for (size_t i=queueIndex+1; i<queue.size(); i++) {
+                            std::cout << "\r" << std::flush;
+                            logger.log(Logger::Level::INFO, "Attempting preload of track: " + queue.at(queueIndex));
+                            PlayerActionResult preload = player.load(queue.at(i), true, false, true);
 
-                        PlayerActionResult preload = player.load(queue.at(queueIndex+1), true, false, true);
+                            if (preload) {
+                                preloaded = i;
+                                break;
+                            }
+                        }
+
                     }
 
 
@@ -157,21 +166,26 @@ int main(int argc, char* argv[]) {
                             player.flags.trackAdvanced.store(false);
                             player.flags.trackFinished.store(false);
                             maximumPos = player.getMaxVPos(); // until it does change >:)
-                            queueIndex++;
+                            queueIndex = preloaded;
 
-                            preloaded = false;
+                            std::cout << "\r" << std::flush;
+                            logger.log(Logger::Level::INFO, "Next track (preload): " + queue.at(queueIndex));
+
+                            preloaded = -1;
                         } else if (player.flags.trackPreloaded && player.flags.reconfigureNeeded.load()) {
                             // preload, but we need to manually call .play() again (reconfiguration)
                             player.flags.trackFinished.store(false);
 
-                            queueIndex++;
-                            preloaded = false;
+                            queueIndex = preloaded;
+                            preloaded = -1;
+                            std::cout << "\r" << std::flush;
+                            logger.log(Logger::Level::INFO, "Next track (preload - reconfigure): " + queue.at(queueIndex));
                             player.play();
                         }
 
                         else { // track ended (no preload)
                             player.flags.trackFinished.store(false);
-                            preloaded = false;
+                            preloaded = -1;
 
                             break;
                         }
