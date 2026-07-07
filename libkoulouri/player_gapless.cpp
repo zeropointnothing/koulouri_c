@@ -7,7 +7,7 @@
 #include <string>
 #include "libkoulouri/FormatTools.h"
 #include "logger.h"
-#include "player_gappless.h"
+#include "player_gapless.h"
 
 FfmpegFile::FfmpegFile(const std::string &inputPath) {
     // Create temp file
