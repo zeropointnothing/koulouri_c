@@ -1,8 +1,10 @@
 #include <algorithm>
 #include <atomic>
+#include <cstdio>
 #include <deque>
 #include <filesystem>
 #include <iostream>
+#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
@@ -11,16 +13,193 @@
 #include <signal.h>
 #include "libkoulouri/logger.h"
 #include "libkoulouri/metahandler.h"
-#include "libkoulouri/player_gappless.h"
+#include "libkoulouri/player_gapless.h"
 #include "koulouri_shared/alsasilencer.h"
 #include "koulouri_shared/cmdparser.h"
 
 std::atomic<bool> running = true;
+std::mutex outputMutex;
+std::atomic<int> volume = 70;
+enum Action {
+    NONE,
+    PAUSE,
+    RESUME,
+    QUIT,
+    VOLUP,
+    VOLDOWN,
+    SKIP
+};
+std::atomic<Action> action;
 
 void handleSignal(int signal) {
     std::cout << "Recieved quit signal!" << std::endl;
     running.store(false);
     // exit(0); // Exit the program
+}
+
+void main_inputThread() {
+    std::string input;
+    while (running.load()) {
+
+        if (!std::getline(std::cin, input)) {
+            running = false;
+            break;
+        }
+        if (input == "quit") {
+            running = false;
+        } else if (input == "vu") {
+            action.store(Action::VOLUP);
+        } else if (input == "vd") {
+            action.store(Action::VOLDOWN);
+        } else if (input == "pause") {
+            action.store(Action::PAUSE);
+        } else if (input == "resume") {
+            action.store(Action::RESUME);
+        } else if (input == "skip") {
+            action.store(Action::SKIP);
+        }
+    }
+}
+
+void main_outputThread(Logger logger, std::deque<std::string> queue, bool shouldPreload) {
+    AudioPlayer player;
+    int preloaded = -1;
+    size_t queueIndex = 0;
+
+    logger.log(Logger::Level::INFO, "Playing: " + std::to_string(queue.size()) + " tracks");
+
+    while (running.load()) {
+        if (queueIndex >= queue.size()) {
+            logger.log(Logger::Level::INFO, "Reached end of queue!");
+            break;
+        }
+
+        const std::string &file = queue.at(queueIndex);
+
+        PlayerActionResult result = player.load(file, true);
+
+        if (result.result == PlayerActionEnum::PASS) {
+            player.setVolume(volume.load());
+            PlayerActionResult play = player.play();
+            // set to 10 seconds till end (preload testing)
+            // if (queueIndex == 0) {
+            //     player.setVPos(player.getMaxVPos() - player.secondsToVPos(10));
+            // }
+
+            size_t maximumPos = player.getMaxVPos(); // this doesn't change - get it once!
+
+            while (running.load()) {
+                if (shouldPreload && player.getVPos() > (player.getMaxVPos() - player.secondsToVPos(5)) && (preloaded==-1 && queueIndex+1 < queue.size())) {
+                    for (size_t i=queueIndex+1; i<queue.size(); i++) {
+                        std::cout << "\r" << std::flush;
+                        logger.log(Logger::Level::INFO, "Attempting preload of track: " + queue.at(i));
+                        PlayerActionResult preload = player.load(queue.at(i), true, false, true);
+
+                        if (preload) {
+                            preloaded = i;
+                            break;
+                        } else if (preload.result == PlayerActionEnum::FAIL) {
+                            logger.log(Logger::Level::INFO, "Could not preload track, skipping!");
+                            continue;
+                        }
+                    }
+
+                    // We need to preload, but the above loop was unable to locate any playable files.
+                    // This almost always means the rest of the playlist is unplayable, and thus we've hit the end of the playlist.
+                    // We should thus gracefully exit.
+                    if (preloaded == -1) {
+                        logger.log(Logger::Level::INFO, "No track was preloaded, assuming end of playlist.");
+                        queueIndex = queue.size();
+                    }
+                }
+
+
+                if (player.flags.trackFinished.load()) {
+                    if (player.flags.trackAdvanced.load()) { // typical preload
+                        player.flags.trackAdvanced.store(false);
+                        player.flags.trackFinished.store(false);
+                        maximumPos = player.getMaxVPos(); // until it does change >:)
+                        queueIndex = preloaded;
+
+                        std::cout << "\r" << std::flush;
+                        logger.log(Logger::Level::INFO, "Next track (preload): " + queue.at(queueIndex));
+
+                        preloaded = -1;
+                    } else if (player.flags.trackPreloaded && player.flags.reconfigureNeeded.load()) {
+                        // preload, but we need to manually call .play() again (reconfiguration)
+                        player.flags.trackFinished.store(false);
+
+                        queueIndex = preloaded;
+                        preloaded = -1;
+                        std::cout << "\r" << std::flush;
+                        logger.log(Logger::Level::INFO, "Next track (preload - reconfigure): " + queue.at(queueIndex));
+                        player.play();
+                    }
+
+                    else { // track ended (no preload)
+                        player.flags.trackFinished.store(false);
+                        preloaded = -1;
+
+                        break;
+                    }
+                }
+
+                const size_t currentPos = player.getVPos();
+
+                // TODO: find an efficent way to round up to 2nd decimal!
+
+                {
+                    std::lock_guard<std::mutex> lock(outputMutex);
+                    const std::string status = std::to_string(player.vposToSeconds(player.getVPos())) +
+                    "(" + std::to_string(currentPos) + ") " +
+                    std::to_string((static_cast<double>(currentPos) / maximumPos) * 100) + "% | " +
+                    std::to_string(player.getVolume()) + "% ";
+                    std::cout << "\r" << status << std::to_string(action.load());
+                    std::cout.flush();
+                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+                }
+
+                // action checks
+                switch (action.load()) {
+                    case Action::VOLUP: {
+                        volume.store(volume.load()+10);
+                        player.setVolume(volume.load());
+                        break;
+                    }
+                    case Action::VOLDOWN: {
+                        volume.store(volume.load()-10);
+                        player.setVolume(volume.load());
+                        break;
+                    }
+                    case Action::PAUSE: {
+                        player.pause();
+                        break;
+                    }
+                    case Action::RESUME: {
+                        player.resume();
+                        break;
+                    }
+                    case Action::SKIP: {
+                        if (preloaded == -1) {
+                            player.flags.trackFinished.store(true);
+                        } else {
+                            player.setVPos(player.getMaxVPos());
+                        }
+                        break;
+                    }
+                    default: {}
+                }
+                action.store(Action::NONE);
+            }
+
+            std::cout << std::endl;
+        } else {
+            std::cout << "Failed to open file '" << file << "'" << ": " << result.getFriendly() << std::endl;
+        }
+
+        player.stop();
+        queueIndex += 1;
+    }
 }
 
 int main(int argc, char* argv[]) {
@@ -29,12 +208,10 @@ int main(int argc, char* argv[]) {
 
     Logger::setOutput(&std::cerr);
 
-    int volume = 70;
     bool shouldPreload = false;
 
     CmdParser cmd;
     std::deque<std::string> queue;
-    size_t queueIndex = 0;
 
     // cmd.register_argument({"", "", ArgType::SWITCH});
     cmd.register_argument({"-h", "--help", ArgType::SWITCH});
@@ -120,99 +297,11 @@ int main(int argc, char* argv[]) {
     }
 
     if (queue.size() > 0) {
-        AudioPlayer player;
-        int preloaded = -1;
-
-        logger.log(Logger::Level::INFO, "Playing: " + std::to_string(queue.size()) + " tracks");
-
-        while (running.load()) {
-            if (queueIndex >= queue.size()) {
-                logger.log(Logger::Level::INFO, "Reached end of queue!");
-                break;
-            }
-
-            const std::string &file = queue.at(queueIndex);
-
-            PlayerActionResult result = player.load(file, true);
-
-            if (result.result == PlayerActionEnum::PASS) {
-                player.setVolume(volume);
-                PlayerActionResult play = player.play();
-                // set to 10 seconds till end (preload testing)
-                // if (queueIndex == 0) {
-                //     player.setVPos(player.getMaxVPos() - player.secondsToVPos(10));
-                // }
-
-                size_t maximumPos = player.getMaxVPos(); // this doesn't change - get it once!
-
-                while (running.load()) {
-                    if (shouldPreload && player.getVPos() > (player.getMaxVPos() - player.secondsToVPos(5)) && (preloaded==-1 && queueIndex+1 < queue.size())) {
-                        for (size_t i=queueIndex+1; i<queue.size(); i++) {
-                            std::cout << "\r" << std::flush;
-                            logger.log(Logger::Level::INFO, "Attempting preload of track: " + queue.at(queueIndex));
-                            PlayerActionResult preload = player.load(queue.at(i), true, false, true);
-
-                            if (preload) {
-                                preloaded = i;
-                                break;
-                            }
-                        }
-
-                    }
-
-
-                    if (player.flags.trackFinished.load()) {
-                        if (player.flags.trackAdvanced.load()) { // typical preload
-                            player.flags.trackAdvanced.store(false);
-                            player.flags.trackFinished.store(false);
-                            maximumPos = player.getMaxVPos(); // until it does change >:)
-                            queueIndex = preloaded;
-
-                            std::cout << "\r" << std::flush;
-                            logger.log(Logger::Level::INFO, "Next track (preload): " + queue.at(queueIndex));
-
-                            preloaded = -1;
-                        } else if (player.flags.trackPreloaded && player.flags.reconfigureNeeded.load()) {
-                            // preload, but we need to manually call .play() again (reconfiguration)
-                            player.flags.trackFinished.store(false);
-
-                            queueIndex = preloaded;
-                            preloaded = -1;
-                            std::cout << "\r" << std::flush;
-                            logger.log(Logger::Level::INFO, "Next track (preload - reconfigure): " + queue.at(queueIndex));
-                            player.play();
-                        }
-
-                        else { // track ended (no preload)
-                            player.flags.trackFinished.store(false);
-                            preloaded = -1;
-
-                            break;
-                        }
-                    }
-
-                    const size_t currentPos = player.getVPos();
-
-                    // TODO: find an efficent way to round up to 2nd decimal!
-
-                    const std::string status = std::to_string(player.vposToSeconds(player.getVPos())) +
-                    "(" + std::to_string(currentPos) + ") " +
-                    std::to_string((static_cast<double>(currentPos) / maximumPos) * 100) + "% | " +
-                    std::to_string(player.getVolume()) + "% ";
-                    std::cout << "\r" << status;
-                    std::cout.flush();
-                    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-                }
-
-                std::cout << std::endl;
-            } else {
-                std::cout << "Failed to open file '" << file << "'" << ": " << result.getFriendly() << std::endl;
-            }
-
-            player.stop();
-            queueIndex += 1;
-        }
-
+        std::thread tMainOut(main_outputThread, logger, queue, shouldPreload);
+        std::thread tMainIn(main_inputThread);
+        tMainOut.join();
+        tMainIn.join();
+        return 0;
     }
 
     // for (int i = 1; i < argc; ++i) {
