@@ -22,29 +22,31 @@ add_executable(koulouri_c-qt)
 add_executable(koulouri_c-curses)
 add_executable(koulouri_c-cli)
 target_sources(koulouri_c-qt PRIVATE
-        src/qt_gui/qtmainwindow.cpp
-        include/koulouri/qt_gui/qtmainwindow.h
-        src/qt_gui/main.cpp
+        frontend/qt_gui/qtmainwindow.cpp
+        frontend/qt_gui/qtmainwindow.h
+        frontend/qt_gui/main.cpp
 )
 target_sources(koulouri_c-curses PRIVATE
-        src/curses_gui/cursesmainwindow.cpp
-        include/koulouri/curses_gui/cursesmainwindow.h
-        src/curses_gui/main.cpp
+        frontend/curses_gui/cursesmainwindow.cpp
+        frontend/curses_gui/cursesmainwindow.h
+        frontend/curses_gui/main.cpp
 )
 target_sources(koulouri_c-cli PRIVATE
-    src/koulouri_cli/main.cpp
+    frontend/koulouri_cli/main.cpp
+)
+
+# set up testing compile target(s)
+add_executable(koulouri_test)
+target_sources(koulouri_test PRIVATE
+    test.cpp
 )
 
 # organization
 set_target_properties(koulouri_c-qt PROPERTIES FOLDER "GUI/Qt")
 set_target_properties(koulouri_c-curses PROPERTIES FOLDER "GUI/Curses")
 
-# add /include to all executables
-target_include_directories(koulouri_c-qt PRIVATE ${CMAKE_SOURCE_DIR}/include/koulouri)
-target_include_directories(koulouri_c-curses PRIVATE ${CMAKE_SOURCE_DIR}/include/koulouri)
-target_include_directories(koulouri_c-cli PRIVATE ${CMAKE_SOURCE_DIR}/include/koulouri)
-
 # link libraries
 target_link_libraries(koulouri_c-qt PRIVATE libkoulouri koulouri_shared Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(koulouri_c-curses PRIVATE libkoulouri koulouri_shared ncurses)
 target_link_libraries(koulouri_c-cli PRIVATE libkoulouri koulouri_shared)
+target_link_libraries(koulouri_test PRIVATE libkoulouri)
