@@ -5,7 +5,7 @@
 #include <sndfile.h>
 #include <sstream>
 #include <string>
-#include "libkoulouri/FormatTools.h"
+#include "FormatTools.h"
 #include "logger.h"
 #include "player_gapless.h"
 
