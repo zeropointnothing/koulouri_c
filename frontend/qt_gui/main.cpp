@@ -3,7 +3,7 @@
 #include <ostream>
 #include <QApplication>
 
-#include "qt_gui/qtmainwindow.h"
+#include "qtmainwindow.h"
 #include "koulouri_shared/alsasilencer.h"
 
 int main(int argc, char *argv[]) {

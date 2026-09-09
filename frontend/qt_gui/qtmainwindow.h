@@ -2,7 +2,7 @@
 #define QtMainWindow_H
 
 #include "libkoulouri/metahandler.h"
-#include "libkoulouri/player.h"
+#include "libkoulouri/player_gapless.h"
 #include <QMainWindow>
 #include <qtimer.h>
 

@@ -1,6 +1,6 @@
-#include "qt_gui/qtmainwindow.h"
+#include "qtmainwindow.h"
 #include "ui_qtmainwindow.h"
-#include "libkoulouri/player.h"
+#include "libkoulouri/player_gapless.h"
 #include <QDebug>
 #include <QDesktopServices>
 #include <QUrl>
@@ -47,7 +47,7 @@ void QtMainWindow::setPlaybackState(PlaybackState state) {
 };
 
 void QtMainWindow::updateProgressBar() {
-    int position = (static_cast<double>(player.getPos()) / player.getMaxPos()*100);
+    int position = (static_cast<double>(player.getVPos()) / player.getMaxVPos()*100);
 
     if (position == 100) {
         stopPlayback();
@@ -115,7 +115,7 @@ void QtMainWindow::initializePlaybackUI() {
 
             // Prevent GUI lockup during FFmpeg conversion/IO.
             // all further Qt calls should be made by the main thread with invokeMethod.
-            QtConcurrent::run([this] {
+            QFuture<void> _ = QtConcurrent::run([this] {
                 if (!player.isLoaded()) {
                     PlayerActionResult result = player.load(PATH, hasseen_conversionMessage);
                     if (result.result == PlayerActionEnum::NOTSUPPORTED) {
