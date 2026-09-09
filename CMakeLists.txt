@@ -36,10 +36,10 @@ target_sources(koulouri_c-cli PRIVATE
 )
 
 # set up testing compile target(s)
-add_executable(koulouri_test)
-target_sources(koulouri_test PRIVATE
-    test.cpp
-)
+# add_executable(koulouri_test)
+# target_sources(koulouri_test PRIVATE
+#     test.cpp
+# )
 
 # organization
 set_target_properties(koulouri_c-qt PROPERTIES FOLDER "GUI/Qt")
@@ -49,4 +49,4 @@ set_target_properties(koulouri_c-curses PROPERTIES FOLDER "GUI/Curses")
 target_link_libraries(koulouri_c-qt PRIVATE libkoulouri koulouri_shared Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(koulouri_c-curses PRIVATE libkoulouri koulouri_shared ncurses)
 target_link_libraries(koulouri_c-cli PRIVATE libkoulouri koulouri_shared)
-target_link_libraries(koulouri_test PRIVATE libkoulouri)
+# target_link_libraries(koulouri_test PRIVATE libkoulouri)
