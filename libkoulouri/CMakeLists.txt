@@ -1,4 +1,4 @@
-add_library(libkoulouri STATIC player.cpp metahandler.cpp
+add_library(libkoulouri STATIC player_gapless.cpp metahandler.cpp
         FormatTools.cpp
         FormatTools.h
         logger.cpp
